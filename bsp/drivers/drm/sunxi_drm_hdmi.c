@@ -2532,7 +2532,12 @@ static void _sunxi_drm_hdmi_enable(struct drm_encoder *encoder,
 	disp_cfg.format      = hdmi->disp_config.format;
 	disp_cfg.irq_handler = sunxi_crtc_event_proc;
 	disp_cfg.irq_data    = scrtc_state->base.crtc;
-	disp_cfg.sw_enable   = hdmi->hdmi_ctrl.drv_sw_enable;
+	/* Force full HDMI PHY initialization.
+	 * U-Boot does not configure HDMI on this board, so the smooth-boot
+	 * path (sw_enable) must be bypassed: clear sw_enable for TCON and
+	 * reset drv_enable so _sunxi_drv_hdmi_enable() does not return early.
+	 */
+	disp_cfg.sw_enable   = 0;
 
 	ret = sunxi_tcon_mode_init(tcon_dev, &disp_cfg);
 	if (ret != 0) {
@@ -2540,10 +2545,9 @@ static void _sunxi_drm_hdmi_enable(struct drm_encoder *encoder,
 		return;
 	}
 
-	if (hdmi->hdmi_ctrl.drv_sw_enable)
-		ret = _sunxi_drv_hdmi_smooth_enable(hdmi);
-	else
-		ret = _sunxi_drv_hdmi_enable(hdmi);
+	hdmi->hdmi_ctrl.drv_enable = 0;
+	ret = _sunxi_drv_hdmi_enable(hdmi);
+	
 	if (ret != 0) {
 		hdmi_err("drm hdmi enable driver failed\n");
 		return;
